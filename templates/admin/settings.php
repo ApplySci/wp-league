@@ -119,6 +119,45 @@ if ($oauth_error) {
             </tr>
         </table>
 
+        <h2><?php esc_html_e('Database Settings', 'league-profiles'); ?></h2>
+        <table class="form-table" role="presentation">
+            <tr>
+                <th scope="row"><?php esc_html_e('SQLite Database', 'league-profiles'); ?></th>
+                <td>
+                    <?php
+                    $database_path = get_option('league_database_path');
+                    if ($database_path && file_exists($database_path)):
+                    ?>
+                        <p class="description">
+                            <?php echo esc_html(sprintf(
+                                __('Current database: %s', 'league-profiles'),
+                                $database_path
+                            )); ?>
+                        </p>
+                    <?php endif; ?>
+                    
+                    <form method="post" 
+                          action="<?php echo esc_url(admin_url('admin-post.php')); ?>" 
+                          enctype="multipart/form-data">
+                        
+                        <input type="hidden" name="action" value="upload_database">
+                        <?php wp_nonce_field('upload_database', 'database_nonce'); ?>
+                        
+                        <input type="file" 
+                               name="league_database" 
+                               accept=".db,.sqlite,.sqlite3"
+                               required>
+                        
+                        <?php submit_button(__('Upload Database', 'league-profiles'), 'secondary'); ?>
+                    </form>
+                    
+                    <p class="description">
+                        <?php esc_html_e('Upload a SQLite database file containing league data.', 'league-profiles'); ?>
+                    </p>
+                </td>
+            </tr>
+        </table>
+
         <?php submit_button(); ?>
     </form>
 </div>

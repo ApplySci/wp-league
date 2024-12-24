@@ -11,6 +11,7 @@ class League_Admin {
         add_action('admin_init', [$this, 'register_settings']);
         add_action('admin_enqueue_scripts', [$this, 'enqueue_admin_assets']);
         add_action('admin_post_invite_player', [$this, 'handle_player_invitation']);
+        add_action('admin_post_upload_database', [$this, 'handle_database_upload']);
     }
 
     public function add_menu_pages(): void {
@@ -145,5 +146,60 @@ class League_Admin {
             wp_die(__('You do not have permission to access this page.', 'league-profiles'));
         }
         require_once LEAGUE_PLUGIN_DIR . 'templates/admin/settings.php';
+    }
+
+    public function handle_database_upload(): void {
+        try {
+            if (!current_user_can('manage_options')) {
+                throw new Exception('Insufficient permissions');
+            }
+
+            if (!isset($_FILES['league_database']) || !isset($_POST['database_nonce'])) {
+                throw new Exception('Invalid request');
+            }
+
+            if (!wp_verify_nonce($_POST['database_nonce'], 'upload_database')) {
+                throw new Exception('Security check failed');
+            }
+
+            $file = $_FILES['league_database'];
+            if ($file['error'] !== UPLOAD_ERR_OK) {
+                throw new Exception('File upload failed');
+            }
+
+            if ($file['type'] !== 'application/x-sqlite3' && $file['type'] !== 'application/octet-stream') {
+                throw new Exception('Invalid file type. Must be SQLite database.');
+            }
+
+            $upload_dir = wp_upload_dir();
+            $database_dir = $upload_dir['basedir'] . '/league-database';
+            if (!file_exists($database_dir)) {
+                wp_mkdir_p($database_dir);
+            }
+
+            $database_path = $database_dir . '/league.db';
+            if (move_uploaded_file($file['tmp_name'], $database_path)) {
+                update_option('league_database_path', $database_path);
+                add_settings_error(
+                    'league_settings',
+                    'database_uploaded',
+                    __('Database uploaded successfully.', 'league-profiles'),
+                    'updated'
+                );
+            } else {
+                throw new Exception('Failed to move uploaded file');
+            }
+
+        } catch (Exception $e) {
+            add_settings_error(
+                'league_settings',
+                'database_error',
+                $e->getMessage(),
+                'error'
+            );
+        }
+
+        wp_safe_redirect(admin_url('admin.php?page=league-settings'));
+        exit;
     }
 } 

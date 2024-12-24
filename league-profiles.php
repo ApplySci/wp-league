@@ -17,7 +17,14 @@ if (!defined('ABSPATH')) {
 
 define('LEAGUE_PLUGIN_DIR', plugin_dir_path(__FILE__));
 define('LEAGUE_PLUGIN_URL', plugin_dir_url(__FILE__));
-define('LEAGUE_GAME_DB_PATH', WP_CONTENT_DIR . '/database/league.db');
+
+// Update the database path constant to use the uploaded path if available
+$database_path = get_option('league_database_path');
+if ($database_path && file_exists($database_path)) {
+    define('LEAGUE_GAME_DB_PATH', $database_path);
+} else {
+    define('LEAGUE_GAME_DB_PATH', WP_CONTENT_DIR . '/database/league.db');
+}
 
 // Autoloader
 spl_autoload_register(function ($class) {
