@@ -1,0 +1,57 @@
+/* Settings Page */
+.league-settings-page {
+    max-width: 800px;
+    padding: 20px;
+}
+
+.form-table input[type="text"],
+.form-table input[type="password"] {
+    width: 100%;
+    max-width: 400px;
+}
+
+/* Invite Player Page */
+.invite-player-form {
+    max-width: 600px;
+    margin-top: 20px;
+}
+
+/* Custom Columns in Player List */
+.column-last_login,
+.column-rating,
+.column-games_played {
+    width: 10%;
+}
+
+.column-email {
+    width: 20%;
+}
+
+/* Success/Error Messages */
+.settings-error {
+    margin: 1rem 0;
+}
+
+/* Player List Filters */
+.tablenav .actions {
+    padding: 8px 0;
+}
+
+.tablenav .actions select {
+    margin-right: 8px;
+}
+
+/* Responsive Admin */
+@media screen and (max-width: 782px) {
+    .form-table input[type="text"],
+    .form-table input[type="password"] {
+        max-width: 100%;
+    }
+    
+    .column-last_login,
+    .column-rating,
+    .column-games_played,
+    .column-email {
+        display: none;
+    }
+} 
