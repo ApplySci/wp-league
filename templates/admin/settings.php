@@ -1,52 +1,144 @@
+<?php
+declare(strict_types=1);
+
+if (!defined('ABSPATH')) {
+    exit;
+}
+
+if (!current_user_can('manage_options')) {
+    wp_die(__('You do not have permission to access this page.', 'league-profiles'));
+}
+
+// Get any existing OAuth errors
+$oauth_error = get_transient('league_oauth_error');
+if ($oauth_error) {
+    delete_transient('league_oauth_error');
+}
+?>
+
 <div class="wrap">
     <h1><?php echo esc_html(get_admin_page_title()); ?></h1>
 
-    <form method="post" action="options.php">
+    <?php if ($oauth_error): ?>
+        <div class="notice notice-error">
+            <p><?php echo esc_html($oauth_error); ?></p>
+        </div>
+    <?php endif; ?>
+
+    <form method="post" action="options.php" class="league-settings-form">
         <?php
         settings_fields('league_settings');
         do_settings_sections('league_settings');
         ?>
 
-        <h2>OAuth Settings</h2>
-        <table class="form-table">
+        <h2><?php esc_html_e('OAuth Settings', 'league-profiles'); ?></h2>
+        <table class="form-table" role="presentation">
             <tr>
-                <th scope="row">Google Client ID</th>
+                <th scope="row"><?php esc_html_e('Google Client ID', 'league-profiles'); ?></th>
                 <td>
                     <input type="text" 
                            name="league_google_client_id" 
                            value="<?php echo esc_attr(get_option('league_google_client_id')); ?>" 
-                           class="regular-text">
+                           class="regular-text"
+                           pattern="^[0-9]+[-][a-zA-Z0-9_\.]+\.apps\.googleusercontent\.com$"
+                           title="<?php esc_attr_e('Please enter a valid Google Client ID', 'league-profiles'); ?>">
                 </td>
             </tr>
             <tr>
-                <th scope="row">Google Client Secret</th>
+                <th scope="row"><?php esc_html_e('Google Client Secret', 'league-profiles'); ?></th>
                 <td>
                     <input type="password" 
                            name="league_google_client_secret" 
                            value="<?php echo esc_attr(get_option('league_google_client_secret')); ?>" 
-                           class="regular-text">
+                           class="regular-text"
+                           autocomplete="new-password">
+                    <p class="description">
+                        <?php esc_html_e('Store this securely. It will be encrypted before saving.', 'league-profiles'); ?>
+                    </p>
                 </td>
             </tr>
             <tr>
-                <th scope="row">Apple Client ID</th>
+                <th scope="row"><?php esc_html_e('Apple Client ID', 'league-profiles'); ?></th>
                 <td>
                     <input type="text" 
                            name="league_apple_client_id" 
                            value="<?php echo esc_attr(get_option('league_apple_client_id')); ?>" 
-                           class="regular-text">
+                           class="regular-text"
+                           pattern="^[a-zA-Z0-9\.]+$"
+                           title="<?php esc_attr_e('Please enter a valid Apple Client ID', 'league-profiles'); ?>">
                 </td>
             </tr>
             <tr>
-                <th scope="row">Apple Client Secret</th>
+                <th scope="row"><?php esc_html_e('Apple Client Secret', 'league-profiles'); ?></th>
                 <td>
                     <input type="password" 
                            name="league_apple_client_secret" 
                            value="<?php echo esc_attr(get_option('league_apple_client_secret')); ?>" 
-                           class="regular-text">
+                           class="regular-text"
+                           autocomplete="new-password">
+                    <p class="description">
+                        <?php esc_html_e('Store this securely. It will be encrypted before saving.', 'league-profiles'); ?>
+                    </p>
+                </td>
+            </tr>
+        </table>
+
+        <h2><?php esc_html_e('Security Settings', 'league-profiles'); ?></h2>
+        <table class="form-table" role="presentation">
+            <tr>
+                <th scope="row"><?php esc_html_e('Rate Limiting', 'league-profiles'); ?></th>
+                <td>
+                    <label>
+                        <input type="checkbox" 
+                               name="league_enable_rate_limiting" 
+                               value="1" 
+                               <?php checked(get_option('league_enable_rate_limiting', '1')); ?>>
+                        <?php esc_html_e('Enable rate limiting for API requests', 'league-profiles'); ?>
+                    </label>
+                </td>
+            </tr>
+            <tr>
+                <th scope="row"><?php esc_html_e('Debug Logging', 'league-profiles'); ?></th>
+                <td>
+                    <label>
+                        <input type="checkbox" 
+                               name="league_enable_logging" 
+                               value="1" 
+                               <?php checked(get_option('league_enable_logging', '0')); ?>>
+                        <?php esc_html_e('Enable debug logging', 'league-profiles'); ?>
+                    </label>
+                    <?php if (League_Logger::get_instance()->get_recent_logs()): ?>
+                        <p>
+                            <a href="<?php echo esc_url(admin_url('admin.php?page=league-logs')); ?>" 
+                               class="button">
+                                <?php esc_html_e('View Logs', 'league-profiles'); ?>
+                            </a>
+                        </p>
+                    <?php endif; ?>
                 </td>
             </tr>
         </table>
 
         <?php submit_button(); ?>
     </form>
-</div> 
+</div>
+
+<script>
+jQuery(document).ready(function($) {
+    // Warn before leaving if form has been modified
+    let formModified = false;
+    $('.league-settings-form :input').on('change', function() {
+        formModified = true;
+    });
+
+    $(window).on('beforeunload', function() {
+        if (formModified) {
+            return '<?php esc_js(__('You have unsaved changes. Are you sure you want to leave?', 'league-profiles')); ?>';
+        }
+    });
+
+    $('.league-settings-form').on('submit', function() {
+        formModified = false;
+    });
+});
+</script> 
