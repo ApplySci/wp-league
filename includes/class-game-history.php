@@ -86,8 +86,6 @@ class League_Game_History {
     }
 
     public function __destruct() {
-        if ($this->initialized && $this->db) {
-            $this->db->close();
-        }
+        $this->db?->close();
     }
 } 

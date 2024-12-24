@@ -27,20 +27,18 @@ if ($database_path && file_exists($database_path)) {
 }
 
 // Autoloader
-spl_autoload_register(function ($class) {
+spl_autoload_register(function (string $class): void {
     $prefix = 'League_';
     $base_dir = LEAGUE_PLUGIN_DIR . 'includes/';
 
-    if (strncmp($prefix, $class, strlen($prefix)) !== 0) {
+    if (!str_starts_with($class, $prefix)) {
         return;
     }
 
     $relative_class = substr($class, strlen($prefix));
     $file = $base_dir . str_replace('_', '/', $relative_class) . '.php';
 
-    if (file_exists($file)) {
-        require $file;
-    }
+    require_once $file;
 });
 
 // Initialize plugin

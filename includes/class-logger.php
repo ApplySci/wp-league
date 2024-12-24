@@ -3,7 +3,7 @@ declare(strict_types=1);
 
 class League_Logger {
     private const LOG_FILE = 'league-profiles.log';
-    private static ?League_Logger $instance = null;
+    private static ?self $instance = null;
     private string $log_path;
 
     private function __construct() {

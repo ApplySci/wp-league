@@ -6,7 +6,11 @@ if (!defined('ABSPATH')) {
 }
 
 if (!current_user_can('manage_options')) {
-    wp_die(__('You do not have permission to access this page.', 'league-profiles'));
+    wp_die(
+        message: __('You do not have permission to access this page.', 'league-profiles'),
+        title: 'Permission Error',
+        args: ['response' => 403]
+    );
 }
 
 // Get any existing OAuth errors
