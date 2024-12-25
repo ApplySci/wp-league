@@ -19,9 +19,10 @@
 ### Database Integration
 
 1. **No Game History Showing**
+   - Check database exists in wp-content/uploads/league-profiles/
    - Verify SQLite file permissions
    - Check SQLite3 PHP extension is enabled
-   - Verify database path in configuration
+   - Try re-uploading database through admin interface
    - Check error logs for SQL errors
 
 2. **Performance Issues**

@@ -29,8 +29,19 @@ class League_Roles {
         add_filter('map_meta_cap', [$this, 'map_player_capabilities'], 10, 4);
     }
 
-    public function register_roles(): void {
-        add_role('league_player', 'League Player', self::PLAYER_CAPABILITIES);
+    public static function register_roles(): void {
+        add_role('league_player', 'League Player', [
+            'read' => true,
+            'edit_league_player' => true,
+            'read_league_player' => true
+        ]);
+        
+        $admin_role = get_role('administrator');
+        if ($admin_role) {
+            foreach (self::ADMIN_CAPABILITIES as $cap => $grant) {
+                $admin_role->add_cap($cap, $grant);
+            }
+        }
     }
 
     public function add_admin_capabilities(): void {

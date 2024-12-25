@@ -8,15 +8,27 @@ class League_Game_History {
 
     public function __construct() {
         $this->logger = League_Logger::get_instance();
-        $this->init_db();
     }
 
     private function init_db(): void {
+        if ($this->initialized) {
+            return;
+        }
+
         try {
-            $this->db = new SQLite3(LEAGUE_GAME_DB_PATH);
-            $this->db->enableExceptions(true);
-            $this->db->exec('PRAGMA encoding = "UTF-8"');
-            $this->initialized = true;
+            // Ensure directory exists
+            $db_dir = dirname(LEAGUE_GAME_DB_PATH);
+            if (!is_dir($db_dir)) {
+                wp_mkdir_p($db_dir);
+            }
+
+            // Only try to connect if the database exists
+            if (file_exists(LEAGUE_GAME_DB_PATH)) {
+                $this->db = new SQLite3(LEAGUE_GAME_DB_PATH);
+                $this->db->enableExceptions(true);
+                $this->db->exec('PRAGMA encoding = "UTF-8"');
+                $this->initialized = true;
+            }
         } catch (Exception $e) {
             $this->logger->error('Database initialization failed', $e);
             $this->initialized = false;
@@ -24,6 +36,8 @@ class League_Game_History {
     }
 
     public function get_player_games(string $trr_id, int $limit = 10): ?array {
+        $this->init_db();
+        
         if (!$this->initialized) {
             return null;
         }
@@ -82,6 +96,41 @@ class League_Game_History {
         } catch (Exception $e) {
             $this->logger->error("Error fetching games for player $trr_id", $e);
             return null;
+        }
+    }
+
+    public function is_initialized(): bool {
+        return $this->initialized;
+    }
+
+    public function create_database(): bool {
+        try {
+            // Ensure directory exists
+            $db_dir = dirname(LEAGUE_GAME_DB_PATH);
+            if (!is_dir($db_dir)) {
+                wp_mkdir_p($db_dir);
+            }
+
+            // Create new database
+            $this->db = new SQLite3(LEAGUE_GAME_DB_PATH);
+            $this->db->enableExceptions(true);
+            $this->db->exec('PRAGMA encoding = "UTF-8"');
+            
+            // Create tables
+            $this->db->exec(
+                'CREATE TABLE IF NOT EXISTS players (
+                    id INTEGER PRIMARY KEY,
+                    trr_id TEXT UNIQUE NOT NULL,
+                    name TEXT NOT NULL
+                )'
+            );
+            // Add other table creation statements as needed
+
+            $this->initialized = true;
+            return true;
+        } catch (Exception $e) {
+            $this->logger->error('Database creation failed', $e);
+            return false;
         }
     }
 

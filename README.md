@@ -7,11 +7,20 @@ A WordPress plugin for managing player profiles and game histories for a league 
 ### Main Plugin File
 - `league-profiles.php`: Main plugin entry point. Handles initialization, dependencies and activation/deactivation hooks.
 
+### Core Classes
+- `includes/class-admin.php`: Admin panel functionality
+- `includes/class-post-types.php`: Custom post type registration
+- `includes/class-roles.php`: User role management
+- `includes/class-capabilities.php`: Permission management
+- `includes/class-game-history.php`: SQLite database interface
+- `includes/class-security.php`: Security utilities and rate limiting
+- `includes/class-logger.php`: Debug logging functionality
+
 ### Authentication
-- `includes/auth/class-oauth-provider.php`: Base abstract class for OAuth providers
-- `includes/auth/class-google-provider.php`: Google OAuth2 implementation
-- `includes/auth/class-apple-provider.php`: Apple OAuth2 implementation  
-- `includes/auth/class-auth-controller.php`: Handles OAuth authentication flow and user creation/login
+- `includes/auth/class-oauth-provider.php`: Base OAuth provider
+- `includes/auth/class-google-provider.php`: Google implementation
+- `includes/auth/class-apple-provider.php`: Apple implementation
+- `includes/auth/class-auth-controller.php`: Authentication flow handler
 
 ### Data Management
 - `includes/class-post-types.php`: Registers custom post type for player profiles

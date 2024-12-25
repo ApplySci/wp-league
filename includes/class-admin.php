@@ -172,14 +172,13 @@ class League_Admin {
             }
 
             $upload_dir = wp_upload_dir();
-            $database_dir = $upload_dir['basedir'] . '/league-database';
+            $database_dir = $upload_dir['basedir'] . '/league-profiles';
             if (!file_exists($database_dir)) {
                 wp_mkdir_p($database_dir);
             }
 
             $database_path = $database_dir . '/league.db';
             if (move_uploaded_file($file['tmp_name'], $database_path)) {
-                update_option('league_database_path', $database_path);
                 add_settings_error(
                     'league_settings',
                     'database_uploaded',

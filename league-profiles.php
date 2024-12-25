@@ -2,10 +2,10 @@
 /**
  * Plugin Name: League Profiles
  * Description: Player profiles and game histories for a league system
- * Version: 1.0.0
+ * Version: 1.0.6
  * Requires at least: 5.0
  * Requires PHP: 8.0
- * Author: Your Name
+ * Author: ZAPS
  * Text Domain: league-profiles
  */
 
@@ -19,11 +19,16 @@ define('LEAGUE_PLUGIN_DIR', plugin_dir_path(__FILE__));
 define('LEAGUE_PLUGIN_URL', plugin_dir_url(__FILE__));
 
 // Update the database path constant to use the uploaded path if available
-$database_path = get_option('league_database_path');
-if ($database_path && file_exists($database_path)) {
-    define('LEAGUE_GAME_DB_PATH', $database_path);
+$upload_dir = wp_upload_dir();
+$database_dir = $upload_dir['basedir'] . '/league-profiles';
+$database_path = $database_dir . '/league.db';
+
+// Allow override through WordPress options
+$custom_path = get_option('league_database_path');
+if ($custom_path && file_exists($custom_path)) {
+    define('LEAGUE_GAME_DB_PATH', $custom_path);
 } else {
-    define('LEAGUE_GAME_DB_PATH', WP_CONTENT_DIR . '/database/league.db');
+    define('LEAGUE_GAME_DB_PATH', $database_path);
 }
 
 // Autoloader
@@ -36,10 +41,24 @@ spl_autoload_register(function (string $class): void {
     }
 
     $relative_class = substr($class, strlen($prefix));
-    $file = $base_dir . str_replace('_', '/', $relative_class) . '.php';
+    
+    // Handle auth subdirectory classes
+    if (str_starts_with($relative_class, 'Auth_')) {
+        $file = $base_dir . 'auth/class-' . strtolower(str_replace('_', '-', substr($relative_class, 5))) . '.php';
+    } else {
+        $file = $base_dir . 'class-' . strtolower(str_replace('_', '-', $relative_class)) . '.php';
+    }
 
-    require_once $file;
+    if (file_exists($file)) {
+        require_once $file;
+    }
 });
+
+// Load OAuth related classes in correct order
+require_once LEAGUE_PLUGIN_DIR . 'includes/auth/class-oauth-provider.php';
+require_once LEAGUE_PLUGIN_DIR . 'includes/auth/class-google-provider.php';
+require_once LEAGUE_PLUGIN_DIR . 'includes/auth/class-apple-provider.php';
+require_once LEAGUE_PLUGIN_DIR . 'includes/auth/class-auth-controller.php';
 
 // Initialize plugin
 function league_profiles_init(): void {
@@ -55,10 +74,6 @@ register_activation_hook(__FILE__, function(): void {
     require_once LEAGUE_PLUGIN_DIR . 'includes/class-roles.php';
     League_Roles::register_roles();
     
-    if (!file_exists(LEAGUE_GAME_DB_PATH)) {
-        wp_die('SQLite database not found at: ' . LEAGUE_GAME_DB_PATH);
-    }
-
     // Schedule cleanup tasks
     if (!wp_next_scheduled('league_daily_cleanup')) {
         wp_schedule_event(time(), 'daily', 'league_daily_cleanup');

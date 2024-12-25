@@ -23,7 +23,8 @@ league-profiles/
    ```
 
 2. **Database Access**
-   - The plugin expects the SQLite database at `wp-content/database/league.db`
+   - The plugin stores the SQLite database in `wp-content/uploads/league-profiles/league.db`
+   - Database can be uploaded through the WordPress admin interface
    - For development, you can use a test database with sample data
 
 3. **OAuth Configuration**
