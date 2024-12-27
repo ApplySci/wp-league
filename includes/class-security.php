@@ -82,7 +82,6 @@ class League_Security {
     }
 
     private static function log_security_event(string $message, string $ip = ''): void {
-        $logger = League_Logger::get_instance();
         $ip = $ip ?: self::get_client_ip();
         error_log("Security Event: $message - IP: $ip");
     }

@@ -4,6 +4,7 @@ if (!defined('ABSPATH')) {
 }
 
 $game_history = new League_Game_History();
+$unregistered_players = $game_history->get_unregistered_players();
 ?>
 
 <div class="wrap">
@@ -25,7 +26,12 @@ $game_history = new League_Game_History();
                 </th>
                 <td>
                     <select name="trr_id" id="player_search" class="player-select" required>
-                        <option value=""><?php esc_html_e('Search for player...', 'league-profiles'); ?></option>
+                        <option value=""><?php esc_html_e('Select player...', 'league-profiles'); ?></option>
+                        <?php foreach ($unregistered_players as $player): ?>
+                            <option value="<?php echo esc_attr($player['trr_id']); ?>">
+                                <?php echo esc_html($player['name']); ?>
+                            </option>
+                        <?php endforeach; ?>
                     </select>
                 </td>
             </tr>
@@ -34,11 +40,7 @@ $game_history = new League_Game_History();
                     <label for="player_email"><?php esc_html_e('Email Address', 'league-profiles'); ?></label>
                 </th>
                 <td>
-                    <input type="email" 
-                           name="player_email" 
-                           id="player_email" 
-                           class="regular-text" 
-                           required>
+                    <input type="email" name="player_email" id="player_email" class="regular-text" required>
                 </td>
             </tr>
         </table>
@@ -50,30 +52,8 @@ $game_history = new League_Game_History();
 <script>
 jQuery(document).ready(function($) {
     $('#player_search').select2({
-        ajax: {
-            url: ajaxurl,
-            dataType: 'json',
-            delay: 250,
-            data: function(params) {
-                return {
-                    action: 'search_unregistered_players',
-                    search: params.term,
-                    _ajax_nonce: '<?php echo wp_create_nonce("search_players"); ?>'
-                };
-            },
-            processResults: function(data) {
-                return {
-                    results: data.map(function(player) {
-                        return {
-                            id: player.trr_id,
-                            text: player.name
-                        };
-                    })
-                };
-            },
-            cache: true
-        },
-        minimumInputLength: 2
+        width: '100%',
+        placeholder: '<?php esc_attr_e('Search and select player...', 'league-profiles'); ?>'
     });
 });
 </script> 

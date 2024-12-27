@@ -1,11 +1,11 @@
 <?php
 /**
  * Plugin Name: League Profiles
- * Description: Player profiles and game histories for a league system
- * Version: 1.0.21
+ * Description: Player profiles and game histories for the World Riichi League
+ * Version: 1.0.25
  * Requires at least: 5.0
  * Requires PHP: 8.0
- * Author: ZAPS
+ * Author: Andrew ZP Smith / ZAPS / ApplySci
  * Text Domain: league-profiles
  */
 

@@ -4,11 +4,6 @@ declare(strict_types=1);
 class League_Game_History {
     private ?SQLite3 $db = null;
     private bool $initialized = false;
-    private League_Logger $logger;
-
-    public function __construct() {
-        $this->logger = League_Logger::get_instance();
-    }
 
     private function init_db(): void {
         if ($this->initialized) {
@@ -155,21 +150,36 @@ class League_Game_History {
         }
 
         try {
+            // First check if this trr_id exists in WordPress
+            global $wpdb;
+            $exists_in_wp = $wpdb->get_var(
+                $wpdb->prepare(
+                    "SELECT COUNT(*) 
+                     FROM {$wpdb->postmeta} 
+                     WHERE meta_key = %s 
+                     AND meta_value = %s",
+                    'trr_id',
+                    $trr_id
+                )
+            );
+
+            // If it exists in WordPress, it's not unregistered
+            if ($exists_in_wp > 0) {
+                return false;
+            }
+
+            // Then check if it exists in the game database
             $query = $this->db->prepare(
-                'SELECT COUNT(*) as count
-                 FROM player p
-                 WHERE p.trr_id = :trr_id
-                 AND p.trr_id NOT IN (
-                     SELECT meta_value 
-                     FROM wp_postmeta 
-                     WHERE meta_key = "trr_id"
-                 )'
+                'SELECT COUNT(*) as count 
+                 FROM player 
+                 WHERE trr_id = :trr_id'
             );
 
             $query->bindValue(':trr_id', $trr_id, SQLITE3_TEXT);
             $result = $query->execute();
             $row = $result->fetchArray(SQLITE3_ASSOC);
             
+            // Return true only if it exists in game database but not in WordPress
             return (int)$row['count'] === 1;
 
         } catch (Exception $e) {
@@ -190,7 +200,7 @@ class League_Game_History {
         }
 
         try {
-            // Get total players - use exact table name from models.py
+            // Get total players from SQLite
             $result = $this->db->query('SELECT COUNT(*) as count FROM player');
             if (!$result) {
                 throw new Exception('Failed to query player count');
@@ -198,14 +208,15 @@ class League_Game_History {
             $row = $result->fetchArray(SQLITE3_ASSOC);
             $total = $row['count'];
             
-            // Get registered players
-            $registered = $this->db->querySingle(
-                'SELECT COUNT(*) FROM player 
-                 WHERE trr_id IN (
-                     SELECT meta_value 
-                     FROM ' . $GLOBALS['wpdb']->postmeta . '
-                     WHERE meta_key = "trr_id"
-                 )'
+            // Get registered players from WordPress
+            global $wpdb;
+            $registered = $wpdb->get_var(
+                $wpdb->prepare(
+                    "SELECT COUNT(DISTINCT meta_value) 
+                     FROM {$wpdb->postmeta} 
+                     WHERE meta_key = %s",
+                    'trr_id'
+                )
             );
 
             return [
@@ -217,9 +228,67 @@ class League_Game_History {
             error_log('Error getting player stats summary: ' . $e->getMessage());
             return [
                 'database_exists' => true,
-                'total_players' => 0,
+                'total_players' => -1,
                 'registered_players' => 0
             ];
+        }
+    }
+
+    public function get_unregistered_players(): array {
+        $this->init_db();
+        
+        if (!$this->initialized) {
+            return [];
+        }
+
+        try {
+            // First get all registered trr_ids from WordPress
+            global $wpdb;
+            $registered_ids = $wpdb->get_col(
+                $wpdb->prepare(
+                    "SELECT DISTINCT meta_value 
+                     FROM {$wpdb->postmeta} 
+                     WHERE meta_key = %s",
+                    'trr_id'
+                )
+            );
+
+            // If no registered players, return all players from SQLite
+            if (empty($registered_ids)) {
+                $query = $this->db->prepare(
+                    'SELECT trr_id, name FROM player ORDER BY name ASC'
+                );
+            } else {
+                // Otherwise, get players whose trr_id is not in the registered list
+                $placeholders = str_repeat('?,', count($registered_ids) - 1) . '?';
+                $query = $this->db->prepare(
+                    "SELECT trr_id, name 
+                     FROM player 
+                     WHERE trr_id NOT IN ($placeholders)
+                     ORDER BY name ASC"
+                );
+                
+                // Bind each registered ID
+                foreach ($registered_ids as $i => $id) {
+                    $query->bindValue($i + 1, $id, SQLITE3_TEXT);
+                }
+            }
+
+            $result = $query->execute();
+            
+            $players = [];
+            while ($row = $result->fetchArray(SQLITE3_ASSOC)) {
+                $players[] = [
+                    'trr_id' => $row['trr_id'],
+                    'name' => League_Security::encode_utf8($row['name'])
+                ];
+            }
+
+            return $players;
+
+        } catch (Exception $e) {
+            error_log("Error fetching unregistered players: " . $e->getMessage());
+            return [];
         }
     }
 } 

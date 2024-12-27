@@ -10,7 +10,6 @@ class League_Admin {
         add_action('admin_menu', [$this, 'register_admin_menu']);
         add_action('admin_init', [$this, 'register_settings']);
         add_action('admin_enqueue_scripts', [$this, 'enqueue_admin_assets']);
-        add_action('wp_ajax_search_unregistered_players', [$this, 'handle_ajax_search_players']);
         add_action('admin_post_add_player', [$this, 'handle_add_player']);
         add_action('admin_post_bulk_add_players', [$this, 'handle_bulk_add_players']);
         add_action('admin_post_upload_database', [$this, 'handle_database_upload']);
@@ -111,7 +110,7 @@ class League_Admin {
                 throw new Exception('Failed to send invitation email');
             }
 
-            $this->logger->info("Invitation sent to $email");
+            error_log("Invitation sent to $email");
             
             add_settings_error(
                 'league_invite',
@@ -121,7 +120,7 @@ class League_Admin {
             );
 
         } catch (Exception $e) {
-            $this->logger->error('Invitation error', $e);
+            error_log('Invitation error', $e);
             add_settings_error(
                 'league_invite',
                 'invite_error',
@@ -244,23 +243,6 @@ class League_Admin {
         exit;
     }
 
-    public function handle_ajax_search_players(): void {
-        check_ajax_referer('search_players');
-        
-        if (!current_user_can('edit_others_league_players')) {
-            wp_die(-1);
-        }
-
-        $search = sanitize_text_field($_GET['search'] ?? '');
-        if (empty($search)) {
-            wp_send_json([]);
-        }
-
-        $game_history = new League_Game_History();
-        $players = $game_history->search_unregistered_players($search);
-        wp_send_json($players);
-    }
-
     public function handle_bulk_add_players(): void {
         try {
             if (!current_user_can('edit_others_league_players')) {
@@ -358,25 +340,50 @@ class League_Admin {
         require_once LEAGUE_PLUGIN_DIR . 'templates/admin/bulk-add.php';
     }
 
-    private function debug_upload(): void {
-        $upload_dir = wp_upload_dir();
-        error_log("Upload base dir: " . $upload_dir['basedir']);
-        error_log("Trying to create: " . $upload_dir['basedir'] . '/league-profiles');
+    public function get_player_stats_summary(): array {
+        $this->init_db();
         
-        if (!file_exists($upload_dir['basedir'])) {
-            error_log("Base uploads directory doesn't exist!");
-            return;
+        if (!$this->initialized) {
+            return [
+                'database_exists' => false,
+                'total_players' => 0,
+                'registered_players' => 0
+            ];
         }
-        
-        error_log("Base upload permissions: " . substr(sprintf('%o', fileperms($upload_dir['basedir'])), -4));
-        error_log("Base upload owner: " . posix_getpwuid(fileowner($upload_dir['basedir']))['name']);
-        
-        if (!is_writable($upload_dir['basedir'])) {
-            error_log("Base uploads directory not writable!");
-            return;
+
+        try {
+            // Get total players from game database
+            $result = $this->db->query('SELECT COUNT(*) as count FROM player');
+            if (!$result) {
+                throw new Exception('Failed to query player count');
+            }
+            $row = $result->fetchArray(SQLITE3_ASSOC);
+            $total_in_game_db = $row['count'];
+            
+            // Get count of player profiles in WordPress
+            global $wpdb;
+            $profiles_in_wordpress = $wpdb->get_var(
+                $wpdb->prepare(
+                    "SELECT COUNT(DISTINCT meta_value) 
+                     FROM {$wpdb->postmeta} 
+                     WHERE meta_key = %s",
+                    'trr_id'
+                )
+            );
+
+            return [
+                'database_exists' => true,
+                'total_players' => (int)$total_in_game_db,
+                'registered_players' => (int)$profiles_in_wordpress
+            ];
+        } catch (Exception $e) {
+            error_log('Error getting player stats summary: ' . $e->getMessage());
+            return [
+                'database_exists' => true,
+                'total_players' => -1,
+                'registered_players' => 0
+            ];
         }
-        
-        $result = wp_mkdir_p($upload_dir['basedir'] . '/league-profiles');
-        error_log("mkdir result: " . ($result ? "success" : "failure"));
     }
+
 } 
