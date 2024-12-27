@@ -21,6 +21,7 @@ class League_Post_Types {
             'capability_type' => ['league_player', 'league_players'],
             'map_meta_cap' => true,
             'show_in_admin_bar' => true,
+            'show_in_menu' => false,
             'menu_icon' => 'dashicons-groups',
             'menu_position' => 30
         ]);

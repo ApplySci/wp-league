@@ -26,7 +26,7 @@ try {
     $players_query = new WP_Query($args);
 
 } catch (Exception $e) {
-    $logger->error('Error loading player list', $e);
+    error_log('Error loading player list', $e);
     wp_die(__('Error loading player list. Please try again later.', 'league-profiles'));
 }
 

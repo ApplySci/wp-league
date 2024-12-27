@@ -2,7 +2,7 @@
 /**
  * Plugin Name: League Profiles
  * Description: Player profiles and game histories for a league system
- * Version: 1.0.6
+ * Version: 1.0.21
  * Requires at least: 5.0
  * Requires PHP: 8.0
  * Author: ZAPS

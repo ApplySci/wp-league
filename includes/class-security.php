@@ -84,7 +84,7 @@ class League_Security {
     private static function log_security_event(string $message, string $ip = ''): void {
         $logger = League_Logger::get_instance();
         $ip = $ip ?: self::get_client_ip();
-        $logger->warning("Security Event: $message - IP: $ip");
+        error_log("Security Event: $message - IP: $ip");
     }
 
     public static function cleanup_rate_limits(): void {

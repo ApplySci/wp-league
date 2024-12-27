@@ -123,6 +123,13 @@ if ($oauth_error) {
             </tr>
         </table>
 
+        <?php submit_button(); ?>
+    </form>
+
+    <form method="post" 
+          action="<?php echo esc_url(admin_url('admin-post.php')); ?>" 
+          enctype="multipart/form-data"
+          class="league-database-upload">
         <h2><?php esc_html_e('Database Settings', 'league-profiles'); ?></h2>
         <table class="form-table" role="presentation">
             <tr>
@@ -142,20 +149,12 @@ if ($oauth_error) {
                 </td>
             </tr>
         </table>
-
-        <?php submit_button(); ?>
-    </form>
-
-    <form method="post" 
-          action="<?php echo esc_url(admin_url('admin-post.php')); ?>" 
-          enctype="multipart/form-data"
-          class="league-database-upload">
         
         <input type="hidden" name="action" value="upload_database">
         <?php wp_nonce_field('upload_database', 'database_nonce'); ?>
         
         <input type="file" 
-               name="league_database" 
+               name="database_file"
                accept=".db,.sqlite,.sqlite3"
                required>
         
