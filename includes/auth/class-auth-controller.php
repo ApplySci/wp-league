@@ -54,23 +54,16 @@ class League_Auth_Controller {
         $code = $request->get_param('code');
         $state = $request->get_param('state');
         $provider_name = $request->get_param('provider');
+        $token = $request->get_param('token');
 
         if (!isset($this->providers[$provider_name])) {
-            return new WP_Error(
-                'invalid_provider',
-                'Invalid provider',
-                ['status' => 400]
-            );
+            return new WP_Error('invalid_provider', 'Invalid provider', ['status' => 400]);
         }
 
         $provider = $this->providers[$provider_name];
         
         if (!$provider->verify_state($state)) {
-            return new WP_Error(
-                'invalid_state',
-                'Invalid state parameter',
-                ['status' => 400]
-            );
+            return new WP_Error('invalid_state', 'Invalid state parameter', ['status' => 400]);
         }
 
         try {
@@ -84,6 +77,39 @@ class League_Auth_Controller {
                 throw new Exception('Failed to get user data');
             }
 
+            // If this is a registration flow
+            if ($token) {
+                $invite_data = get_transient("league_invite_$token");
+                if (!$invite_data) {
+                    throw new Exception('Invalid or expired invitation');
+                }
+                $invite_data = json_decode($invite_data, true);
+                
+                // Create the player profile
+                $admin = new League_Admin();
+                $post_id = $admin->create_player_profile($invite_data['trr_id']);
+                
+                // Create or update user
+                $user_id = $this->create_or_update_user($user_data, $provider_name);
+                if (is_wp_error($user_id)) {
+                    return $user_id;
+                }
+
+                // Link user to profile
+                update_post_meta($post_id, 'player_user_id', $user_id);
+                
+                // Delete the invitation token
+                delete_transient("league_invite_$token");
+                
+                wp_set_auth_cookie($user_id, true);
+                
+                return new WP_REST_Response([
+                    'success' => true,
+                    'redirect_url' => get_edit_post_link($post_id, 'raw')
+                ], 200);
+            }
+
+            // Regular login flow
             $user_id = $this->create_or_update_user($user_data, $provider_name);
             if (is_wp_error($user_id)) {
                 return $user_id;
@@ -98,11 +124,7 @@ class League_Auth_Controller {
 
         } catch (Exception $e) {
             error_log('OAuth error: ' . $e->getMessage());
-            return new WP_Error(
-                'oauth_error',
-                'Authentication failed',
-                ['status' => 500]
-            );
+            return new WP_Error('oauth_error', 'Authentication failed', ['status' => 500]);
         }
     }
 

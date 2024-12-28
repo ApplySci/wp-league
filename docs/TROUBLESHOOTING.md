@@ -10,7 +10,18 @@
    - Check SSL certificate if using HTTPS
    - Check error logs for details
 
-2. **State Mismatch Errors**
+2. **Registration Flow Issues**
+   - Check invitation token exists in transients
+   - Verify email matches OAuth account
+   - Check profile creation permissions
+   - Verify redirect handling
+   ```sql
+   -- Check for expired invitation tokens
+   SELECT * FROM wp_options 
+   WHERE option_name LIKE '_transient_league_invite_%';
+   ```
+
+3. **State Mismatch Errors**
    ```
    Solution: Clear transients in wp_options table
    DELETE FROM wp_options WHERE option_name LIKE '_transient_league_oauth%';

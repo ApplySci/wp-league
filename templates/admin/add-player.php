@@ -10,10 +10,41 @@ $unregistered_players = $game_history->get_unregistered_players();
 <div class="wrap">
     <h1><?php echo esc_html(get_admin_page_title()); ?></h1>
 
-    <?php 
+    <?php
+    // Try multiple ways to display messages
+    
+    // 1. Direct settings errors
     settings_errors('league_invite');
+    
+    // 2. Check transient
+    if ($errors = get_transient('settings_errors')) {
+        foreach ($errors as $error) {
+            echo '<div class="notice notice-' . esc_attr($error['type']) . ' is-dismissible">';
+            echo '<p>' . esc_html($error['message']) . '</p>';
+            echo '</div>';
+        }
+        delete_transient('settings_errors');
+    }
+    
+    // 3. Check custom message
+    if ($message = get_transient('league_admin_message')) {
+        echo '<div class="notice notice-success is-dismissible">';
+        echo '<p>' . esc_html($message) . '</p>';
+        echo '</div>';
+        delete_transient('league_admin_message');
+    }
+
     require_once LEAGUE_PLUGIN_DIR . 'templates/admin/database-status.php';
     ?>
+
+    <style>
+        .notice {
+            margin: 1rem 0;
+        }
+        .notice.updated {
+            border-left-color: #46b450;
+        }
+    </style>
 
     <form method="post" action="<?php echo esc_url(admin_url('admin-post.php')); ?>" class="add-player-form">
         <?php wp_nonce_field('add_player', 'player_nonce'); ?>

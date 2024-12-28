@@ -72,10 +72,17 @@ Players are linked between WordPress and the game database using the `trr_id` fi
 
 ## Installation
 
-1. Upload plugin directory to `/wp-content/plugins/`
-2. Activate plugin through WordPress admin
-3. Configure OAuth credentials in Settings
-4. Set up player invitations as needed
+1. Upload plugin to Wordpress
+2. Activate plugin
+3. Configure OAuth credentials in League > Settings
+4. Go to Wordpress > Settings > Permalinks and select any option except "Plain" (recommended: "Post name")
+5. Click "Save Changes" to flush rewrite rules
+6. Set up player invitations as needed
+
+### Important Notes
+- The plugin requires a non-default permalink structure for the registration system to work
+- If you change permalink settings later, remember to revisit Settings > Permalinks and click "Save Changes"
+- Plain permalink structure (/?p=123) is not supported
 
 ## Requirements
 

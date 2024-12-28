@@ -18,9 +18,7 @@ class League_Game_History {
                 
                 // Add debug check
                 $test = $this->db->query('SELECT COUNT(*) as count FROM sqlite_master WHERE type="table" AND name="player"');
-                $row = $test->fetchArray(SQLITE3_ASSOC);
-                error_log('Database initialized. Player table exists: ' . ($row['count'] > 0 ? 'yes' : 'no'));
-                
+                $row = $test->fetchArray(SQLITE3_ASSOC);                
                 $this->initialized = true;
             }
         } catch (Exception $e) {

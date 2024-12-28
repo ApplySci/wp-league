@@ -80,12 +80,23 @@ league-profiles/
    // 3. Update edit form
    ```
 
-2. **Adding OAuth Provider**
+2. **Customizing Registration Flow**
+   - Registration template located in `templates/register.php`
+   - Flow controlled by `League_Auth_Controller::handle_callback()`
+   - Invitation tokens stored as transients
+   - Registration process:
+     1. Admin sends invitation
+     2. User clicks email link
+     3. OAuth authentication
+     4. Profile creation and user linking
+     5. Redirect to profile edit
+
+3. **Adding OAuth Provider**
    - Create new provider class extending `League_OAuth_Provider`
    - Add provider to `League_Auth_Controller`
    - Add settings fields
 
-3. **Database Schema Updates**
+4. **Database Schema Updates**
    - Document changes in SQLite schema
    - Update `class-game-history.php` queries
    - Test with sample data 
