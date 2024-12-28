@@ -21,9 +21,17 @@ abstract class League_OAuth_Provider {
     }
 
     protected function verify_state(string $state): bool {
-        $stored_state = get_transient('league_oauth_state');
-        delete_transient('league_oauth_state');
-        return $stored_state === $state;
+        try {
+            error_log('Verifying state: ' . $state);
+            $decoded = json_decode(base64_decode(strtr($state, '-_', '+/') . str_repeat('=', 3 - (3 + strlen($state)) % 4)), true);
+            error_log('Decoded state in verify: ' . print_r($decoded, true));
+            $result = is_array($decoded) && isset($decoded['p']);
+            error_log('State verification result: ' . ($result ? 'true' : 'false'));
+            return $result;
+        } catch (Exception $e) {
+            error_log('State verification error: ' . $e->getMessage());
+            return false;
+        }
     }
 
     protected function make_request(string $url, array $args = []): ?array {

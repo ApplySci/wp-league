@@ -78,7 +78,7 @@ class League_Admin {
 
         add_submenu_page(
             'league-profiles',
-            __('Settings', 'league-profiles'),
+            __('League settings', 'league-profiles'),
             __('Settings', 'league-profiles'),
             'manage_options',
             'league-profiles'

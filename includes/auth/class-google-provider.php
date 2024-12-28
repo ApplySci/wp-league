@@ -6,23 +6,32 @@ class League_Google_Provider extends League_OAuth_Provider {
 
     public function __construct() {
         parent::__construct();
-        $this->client_id = defined('LEAGUE_GOOGLE_CLIENT_ID') ? LEAGUE_GOOGLE_CLIENT_ID : '';
-        $this->client_secret = defined('LEAGUE_GOOGLE_CLIENT_SECRET') ? LEAGUE_GOOGLE_CLIENT_SECRET : '';
+        $this->client_id = get_option('league_google_client_id', '');
+        $this->client_secret = get_option('league_google_client_secret', '');
     }
 
     public function get_auth_url(): string {
+        if (empty($this->client_id)) {
+            throw new Exception('Google client ID not configured');
+        }
+
+        error_log('Google OAuth redirect URI: ' . $this->redirect_uri);
+        
         $params = [
             'client_id' => $this->client_id,
             'redirect_uri' => $this->redirect_uri,
             'response_type' => 'code',
             'scope' => 'email profile',
-            'state' => $this->generate_state(),
-            'access_type' => 'online'
+            'access_type' => 'online',
+            'prompt' => 'select_account'
         ];
         return self::AUTH_URL . '?' . http_build_query($params);
     }
 
     public function get_token(string $code): ?array {
+        error_log('Getting token with code: ' . $code);
+        error_log('Using redirect URI: ' . $this->redirect_uri);
+        
         $response = wp_remote_post(self::TOKEN_URL, [
             'body' => [
                 'client_id' => $this->client_id,
@@ -34,10 +43,13 @@ class League_Google_Provider extends League_OAuth_Provider {
         ]);
 
         if (is_wp_error($response)) {
+            error_log('Token request error: ' . $response->get_error_message());
             return null;
         }
 
-        return json_decode(wp_remote_retrieve_body($response), true);
+        $body = wp_remote_retrieve_body($response);
+        error_log('Token response: ' . $body);
+        return json_decode($body, true);
     }
 
     public function get_user_data(string $access_token): ?array {

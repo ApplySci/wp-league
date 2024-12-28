@@ -2,7 +2,7 @@
 /**
  * Plugin Name: League Profiles
  * Description: Player profiles and game histories for the World Riichi League
- * Version: 1.0.29
+ * Version: 1.0.31
  * Requires at least: 5.0
  * Requires PHP: 8.0
  * Author: Andrew ZP Smith / ZAPS / ApplySci

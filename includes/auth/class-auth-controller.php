@@ -5,15 +5,29 @@ class League_Auth_Controller {
     private array $providers;
 
     public function __construct() {
+        error_log('Auth controller initialized');
         $this->providers = [
             'google' => new League_Google_Provider(),
             'apple' => new League_Apple_Provider()
         ];
 
         add_action('rest_api_init', [$this, 'register_routes']);
+        add_action('admin_post_league_auth', [$this, 'handle_auth_redirect']);
+        add_action('admin_post_nopriv_league_auth', [$this, 'handle_auth_redirect']);
     }
 
     public function register_routes(): void {
+        error_log('Registering auth routes');
+        
+        register_rest_route('league/v1', '/auth/test', [
+            'methods' => 'GET',
+            'callback' => function() {
+                error_log('Test endpoint called');
+                return new WP_REST_Response(['status' => 'ok'], 200);
+            },
+            'permission_callback' => '__return_true'
+        ]);
+
         register_rest_route('league/v1', '/auth/(?P<provider>[a-zA-Z0-9_-]+)', [
             'methods' => 'GET',
             'callback' => [$this, 'handle_auth'],
@@ -27,10 +41,15 @@ class League_Auth_Controller {
         ]);
 
         register_rest_route('league/v1', '/auth/callback', [
-            'methods' => 'POST',
-            'callback' => [$this, 'handle_callback'],
+            'methods' => ['GET', 'POST'],
+            'callback' => function($request) {
+                error_log('Callback route hit');
+                return $this->handle_callback($request);
+            },
             'permission_callback' => '__return_true'
         ]);
+
+        error_log('REST routes registered for league/v1/auth/*');
     }
 
     public function handle_auth(WP_REST_Request $request): WP_Error|WP_HTTP_Response {
@@ -51,22 +70,38 @@ class League_Auth_Controller {
     }
 
     public function handle_callback(WP_REST_Request $request): WP_Error|WP_REST_Response {
+        error_log('Raw callback request: ' . print_r($request, true));
         $code = $request->get_param('code');
         $state = $request->get_param('state');
-        $provider_name = $request->get_param('provider');
-        $token = $request->get_param('token');
-
-        if (!isset($this->providers[$provider_name])) {
-            return new WP_Error('invalid_provider', 'Invalid provider', ['status' => 400]);
-        }
-
-        $provider = $this->providers[$provider_name];
         
-        if (!$provider->verify_state($state)) {
-            return new WP_Error('invalid_state', 'Invalid state parameter', ['status' => 400]);
-        }
-
         try {
+            error_log('OAuth callback - State: ' . $state);
+            
+            $decoded_state = json_decode(base64_decode(strtr($state, '-_', '+/') . str_repeat('=', 3 - (3 + strlen($state)) % 4)), true);
+            error_log('OAuth callback - Decoded state: ' . print_r($decoded_state, true));
+            
+            if (!$decoded_state) {
+                error_log('OAuth callback - Invalid state format');
+                throw new Exception('Invalid state format');
+            }
+            
+            $provider_name = $decoded_state['p'] ?? '';
+            $token = $decoded_state['t'] ?? '';
+            
+            error_log('OAuth callback - Provider: ' . $provider_name);
+            
+            if (!isset($this->providers[$provider_name])) {
+                error_log('OAuth callback - Invalid provider: ' . $provider_name);
+                return new WP_Error('invalid_provider', 'Invalid provider', ['status' => 400]);
+            }
+
+            $provider = $this->providers[$provider_name];
+            
+            if (!$provider->verify_state($state)) {
+                error_log('OAuth callback - State verification failed');
+                return new WP_Error('invalid_state', 'Invalid state parameter', ['status' => 400]);
+            }
+
             $token_data = $provider->get_token($code);
             if (!$token_data) {
                 throw new Exception('Failed to get access token');
@@ -168,5 +203,21 @@ class League_Auth_Controller {
         }
 
         return $username;
+    }
+
+    public function handle_auth_redirect(): void {
+        $provider = sanitize_key($_GET['provider'] ?? '');
+        $token = sanitize_text_field($_GET['token'] ?? '');
+        
+        if (!isset($this->providers[$provider])) {
+            wp_die('Invalid provider');
+        }
+
+        $auth_url = $this->providers[$provider]->get_auth_url();
+        $state = json_encode(['p' => $provider, 't' => $token]);
+        $auth_url = add_query_arg('state', rtrim(strtr(base64_encode($state), '+/', '-_'), '='), $auth_url);
+        
+        wp_redirect($auth_url);
+        exit;
     }
 } 
