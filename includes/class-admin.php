@@ -2,22 +2,34 @@
 declare(strict_types=1);
 
 class League_Admin {
-    private const INVITE_EMAIL_SUBJECT = 'Invitation to the World Riichi League website';
+    private const INVITE_EMAIL_SUBJECT = 'Invitation to Join World Riichi League';
     private const INVITE_EMAIL_TEMPLATE = <<<END
+        Hello %s,
+
         You've been invited to join the World Riichi League website.
         We're creating a players-only section for the website, where you can see your game history,
         your current rank, and more.
 
         Click here to accept: %s
+
+        Best regards,
+        World Riichi League
         END;
     private const PERMISSION_ERROR = 'Insufficient permissions';
     private const INVALID_REQUEST = 'Invalid request';
     
     private function send_invitation(string $email, string $trr_id): bool {
+        $game_history = new League_Game_History();
+        $player = $game_history->get_player_data($trr_id);
+        
         $token = bin2hex(random_bytes(32));
         set_transient(
             "league_invite_$token", 
-            json_encode(['email' => $email, 'trr_id' => $trr_id]), 
+            json_encode([
+                'email' => $email, 
+                'trr_id' => $trr_id,
+                'name' => $player['name']
+            ]), 
             DAY_IN_SECONDS
         );
 
@@ -28,8 +40,12 @@ class League_Admin {
             __(self::INVITE_EMAIL_SUBJECT, 'league-profiles'),
             sprintf(
                 __(self::INVITE_EMAIL_TEMPLATE, 'league-profiles'),
+                esc_html($player['name']),
                 esc_url($invite_url)
-            )
+            ),
+            [
+                'Content-Type: text/html; charset=UTF-8'
+            ]
         );
     }
 
@@ -412,36 +428,72 @@ class League_Admin {
 
     public function handle_add_player(): void {
         try {
-            if (!current_user_can('edit_others_league_players')) {
-                throw new Exception(__('You do not have permission to add players.', 'league-profiles'));
+            $this->verify_permissions();
+
+            $email = League_Security::sanitize_input($_POST['player_email'] ?? '', 'email');
+            if (!$email) {
+                throw new Exception('Invalid email address');
             }
 
-            check_admin_referer('add_player', 'player_nonce');
-
-            $email = sanitize_email($_POST['player_email']);
-            $trr_id = sanitize_text_field($_POST['trr_id']);
-
-            if (!$this->send_invitation($email, $trr_id)) {
-                throw new Exception(__('Failed to send invitation email', 'league-profiles'));
+            $trr_id = League_Security::sanitize_input($_POST['trr_id'] ?? '', 'text');
+            if (!$trr_id) {
+                throw new Exception('Invalid TRR ID');
             }
 
-            add_settings_error(
-                'league_invite',
-                'invite_sent',
-                __('Invitation sent successfully', 'league-profiles'),
-                'updated'
+            $game_history = new League_Game_History();
+            if (!$game_history->is_unregistered_player($trr_id)) {
+                throw new Exception('Player is already registered or not found');
+            }
+
+            // Get player name from unregistered players list
+            $unregistered_players = $game_history->get_unregistered_players();
+            $player_name = '';
+            foreach ($unregistered_players as $player) {
+                if ($player['trr_id'] === $trr_id) {
+                    $player_name = $player['name'];
+                    break;
+                }
+            }
+
+            if (empty($player_name)) {
+                throw new Exception('Player not found');
+            }
+
+            $token = bin2hex(random_bytes(32));
+            set_transient(
+                "league_invite_$token", 
+                json_encode([
+                    'email' => $email, 
+                    'trr_id' => $trr_id,
+                    'name' => $player_name
+                ]), 
+                DAY_IN_SECONDS
             );
 
-        } catch (Exception $e) {
-            error_log('Invitation error: ' . $e->getMessage());
-            $this->handle_error($e, 'league_invite', 'invite_error');
-        }
+            $invite_url = home_url("/register/?token=$token");
 
-        // Store all current settings errors
-        set_transient('settings_errors', get_settings_errors(), 30);
-        
-        wp_safe_redirect(wp_get_referer());
-        exit;
+            $sent = wp_mail(
+                $email,
+                __(self::INVITE_EMAIL_SUBJECT, 'league-profiles'),
+                sprintf(
+                    __(self::INVITE_EMAIL_TEMPLATE, 'league-profiles'),
+                    esc_html($player_name),
+                    esc_url($invite_url)
+                ),
+                [
+                    'Content-Type: text/html; charset=UTF-8'
+                ]
+            );
+
+            if (!$sent) {
+                throw new Exception('Failed to send invitation');
+            }
+
+            wp_redirect(add_query_arg('message', 'invitation_sent', wp_get_referer()));
+            exit;
+        } catch (Exception $e) {
+            wp_die($e->getMessage());
+        }
     }
 
     private function create_player_profile(string $trr_id): int {

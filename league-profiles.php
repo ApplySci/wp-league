@@ -2,7 +2,7 @@
 /**
  * Plugin Name: League Profiles
  * Description: Player profiles and game histories for the World Riichi League
- * Version: 1.0.31
+ * Version: 1.0.32
  * Requires at least: 5.0
  * Requires PHP: 8.0
  * Author: Andrew ZP Smith / ZAPS / ApplySci
@@ -62,11 +62,22 @@ require_once LEAGUE_PLUGIN_DIR . 'includes/auth/class-auth-controller.php';
 
 // Initialize plugin
 function league_profiles_init(): void {
+    static $initialized = false;
+    if ($initialized) {
+        return;
+    }
+    $initialized = true;
+
     new League_Plugin();
     new League_Admin();
     new League_Post_Types();
     new League_Roles();
-    new League_Auth_Controller();
+    
+    // Only initialize auth controller once and store instance
+    global $league_auth_controller;
+    if (!isset($league_auth_controller)) {
+        $league_auth_controller = new League_Auth_Controller();
+    }
 }
 add_action('plugins_loaded', 'league_profiles_init');
 
