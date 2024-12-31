@@ -6,17 +6,41 @@ if (!defined('ABSPATH')) {
 }
 
 $token = sanitize_text_field($_GET['token'] ?? '');
-$invite_data = get_transient("league_invite_$token");
+$auth_state = sanitize_text_field($_GET['auth_state'] ?? '');
 
-if (!$invite_data) {
-    wp_die(__('Invalid or expired invitation link.', 'league-profiles'));
+// Check if this is a post-authentication redirect
+if ($auth_state && wp_verify_nonce($auth_state, 'auth_complete') && session_id()) {
+    // Set the authentication cookie now that we're on the same domain
+    $auth_token = $_SESSION['auth_token'] ?? '';
+    if ($auth_token) {
+        setcookie('auth_token', $auth_token, [
+            'expires' => time() + WEEK_IN_SECONDS,
+            'path' => COOKIEPATH,
+            'domain' => COOKIE_DOMAIN,
+            'secure' => is_ssl(),
+            'httponly' => true,
+            'samesite' => 'Lax'  // Changed from Strict to Lax
+        ]);
+    }
+    
+    $player_name = $_SESSION['player_name'] ?? '';
+} else {
+    // Normal invitation flow
+    $invite_data = get_transient("league_invite_$token");
+    if (!$invite_data) {
+        wp_die(__('Invalid or expired invitation link.', 'league-profiles'));
+    }
+    $invite_data = json_decode($invite_data, true);
+    $player_name = esc_html($invite_data['name'] ?? '');
 }
 
-$invite_data = json_decode($invite_data, true);
 ?>
 
 <div class="league-register-page">
-    <h1><?php esc_html_e('Welcome to World Riichi League', 'league-profiles'); ?></h1>
+    <h1><?php printf(
+        esc_html__('Welcome to World Riichi League, %s', 'league-profiles'),
+        $player_name
+    ); ?></h1>
     
     <p class="register-intro">
         <?php esc_html_e('Please login', 'league-profiles'); ?>

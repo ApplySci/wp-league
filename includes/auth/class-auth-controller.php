@@ -17,162 +17,147 @@ class League_Auth_Controller {
     }
 
     public function register_routes(): void {
-        error_log('Registering auth routes');
-        
-        register_rest_route('league/v1', '/auth/test', [
-            'methods' => 'GET',
-            'callback' => function() {
-                error_log('Test endpoint called');
-                return new WP_REST_Response(['status' => 'ok'], 200);
-            },
-            'permission_callback' => '__return_true'
-        ]);
-
-        register_rest_route('league/v1', '/auth/(?P<provider>[a-zA-Z0-9_-]+)', [
-            'methods' => 'GET',
-            'callback' => [$this, 'handle_auth_redirect'],
-            'permission_callback' => '__return_true',
-            'args' => [
-                'provider' => [
-                    'required' => true,
-                    'sanitize_callback' => 'sanitize_key'
-                ]
-            ]
-        ]);
-
         register_rest_route('league/v1', '/auth/callback', [
             'methods' => ['GET', 'POST'],
-            'callback' => function($request) {
-                error_log('Callback route hit');
-                return $this->handle_callback($request);
-            },
+            'callback' => [$this, 'handle_callback'],
             'permission_callback' => '__return_true'
         ]);
-
-        error_log('REST routes registered for league/v1/auth/*');
     }
 
-    public function handle_callback(WP_REST_Request $request): WP_Error|WP_REST_Response {
+    public function handle_callback(WP_REST_Request $request): void {
         $code = $request->get_param('code');
         $state = $request->get_param('state');
         
-        error_log('Callback received - Code: ' . $code . ', State: ' . $state);
-        
         if (!$code) {
-            return new WP_Error('invalid_request', 'Missing authorization code');
+            error_log('OAuth callback: Missing code parameter');
+            wp_redirect(home_url('/login/?error=missing_code'));
+            exit;
         }
 
         try {
+            // Decode state first
             $decoded_state = json_decode(base64_decode($state), true);
-            $provider_name = $decoded_state['p'] ?? '';
+            error_log('OAuth callback: Decoded state: ' . print_r($decoded_state, true));
             
-            if (!isset($this->providers[$provider_name])) {
-                throw new Exception('Invalid provider');
+            if (!$decoded_state || 
+                !isset($decoded_state['p']) || 
+                $decoded_state['p'] !== 'google' ||
+                !wp_verify_nonce($decoded_state['nonce'], 'google_auth')) {
+                error_log('OAuth callback: Invalid state parameter');
+                throw new Exception('Invalid state parameter');
             }
 
-            $provider = $this->providers[$provider_name];
+            $provider = $this->providers['google'];
+            error_log('OAuth callback: Getting token...');
             $token_data = $provider->get_token($code);
+            error_log('OAuth callback: Token response: ' . print_r($token_data, true));
             
             if (!$token_data || !isset($token_data['access_token'])) {
+                error_log('OAuth callback: Failed to get access token');
                 throw new Exception('Failed to get access token');
             }
 
-            $user_data = $provider->get_user_data($token_data['access_token']);
-            if (!$user_data || !isset($user_data['email'])) {
+            error_log('OAuth callback: Getting user data...');
+            $user_info = $provider->get_user_data($token_data['access_token']);
+            error_log('OAuth callback: User info: ' . print_r($user_info, true));
+            
+            if (!$user_info || !isset($user_info['email'])) {
+                error_log('OAuth callback: Failed to get user data');
                 throw new Exception('Failed to get user data');
             }
 
-            $user = get_user_by('email', $user_data['email']);
-            if ($user) {
-                wp_set_auth_cookie($user->ID, true);
-                wp_redirect(home_url('/profile/'));
-                exit;
+            // Get token from state
+            $invite_token = $decoded_state['token'] ?? '';
+            error_log('OAuth callback: Invite token: ' . $invite_token);
+            
+            if (!$invite_token) {
+                error_log('OAuth callback: Missing invite token');
+                throw new Exception('Missing invite token');
             }
 
-            wp_redirect(home_url('/register/'));
+            // Verify invite data
+            $invite_data = get_transient("league_invite_$invite_token");
+            error_log('OAuth callback: Invite data: ' . print_r($invite_data, true));
+            
+            if (!$invite_data) {
+                error_log('OAuth callback: Invalid or expired invitation');
+                throw new Exception('Invalid or expired invitation');
+            }
+
+            // Decode the stored invite data
+            $invite_data = json_decode($invite_data, true);
+            if (!$invite_data) {
+                error_log('OAuth callback: Failed to decode invite data');
+                throw new Exception('Invalid invitation data format');
+            }
+
+            // Verify email matches
+            if ($invite_data['email'] !== $user_info['email']) {
+                error_log('OAuth callback: Email mismatch - invite: ' . $invite_data['email'] . ', google: ' . $user_info['email']);
+                throw new Exception('Email address does not match invitation');
+            }
+
+            // Get or create player profile
+            global $wpdb;
+            $profile_id = $wpdb->get_var($wpdb->prepare(
+                "SELECT post_id 
+                 FROM {$wpdb->postmeta} 
+                 WHERE meta_key = 'trr_id' 
+                 AND meta_value = %s 
+                 LIMIT 1",
+                $invite_data['trr_id']
+            ));
+
+            if (!$profile_id) {
+                // Create new player profile
+                $profile_id = wp_insert_post([
+                    'post_title' => $invite_data['name'],
+                    'post_type' => 'league_player',
+                    'post_status' => 'publish',
+                    'meta_input' => [
+                        'trr_id' => $invite_data['trr_id'],
+                        'auth_email' => $user_info['email'],
+                        'auth_provider' => 'google'
+                    ]
+                ]);
+
+                if (is_wp_error($profile_id)) {
+                    throw new Exception('Failed to create player profile');
+                }
+            } else {
+                // Update existing profile with auth details
+                update_post_meta($profile_id, 'auth_email', $user_info['email']);
+                update_post_meta($profile_id, 'auth_provider', 'google');
+            }
+
+            // Store auth data in session
+            if (!session_id()) {
+                session_start();
+            }
+
+            $_SESSION['trr_id'] = $invite_data['trr_id'];
+            $_SESSION['auth_token'] = base64_encode(json_encode([
+                'trr_id' => $invite_data['trr_id'],
+                'timestamp' => time()
+            ]));
+
+            // Redirect to profile edit
+            wp_safe_redirect(get_edit_post_link($profile_id, 'redirect'));
             exit;
 
         } catch (Exception $e) {
             error_log('OAuth error: ' . $e->getMessage());
-            wp_redirect(home_url('/login/?error=' . urlencode($e->getMessage())));
+            error_log('OAuth error trace: ' . $e->getTraceAsString());
+            wp_safe_redirect(home_url('/login/?error=' . urlencode($e->getMessage())));
             exit;
         }
     }
 
-    private function create_or_update_user(array $user_data, string $provider): int|WP_Error {
-        $email = sanitize_email($user_data['email']);
-        if (!is_email($email)) {
-            return new WP_Error('invalid_email', 'Invalid email address provided');
-        }
-
-        $user = get_user_by('email', $email);
-        if ($user) {
-            return $user->ID;
-        }
-
-        $username = sanitize_user(mb_substr($email, 0, strpos($email, '@')));
-        $unique_username = $this->generate_unique_username($username);
-
-        $user_id = wp_insert_user([
-            'user_login' => $unique_username,
-            'user_email' => $email,
-            'user_pass' => wp_generate_password(),
-            'display_name' => sanitize_text_field($user_data['name'] ?? $username),
-            'role' => 'league_player'
-        ]);
-
-        if (is_wp_error($user_id)) {
-            return $user_id;
-        }
-
-        update_user_meta($user_id, 'oauth_provider', $provider);
-        return $user_id;
-    }
-
-    private function generate_unique_username(string $base_username): string {
-        $username = $base_username;
-        $counter = 1;
-
-        while (username_exists($username)) {
-            $username = $base_username . $counter;
-            $counter++;
-        }
-
-        return $username;
-    }
-
     public function handle_auth_redirect(): void {
-        error_log('Starting auth redirect...');
-        
-        $provider = sanitize_key($_REQUEST['provider'] ?? '');
-        if (empty($provider)) {
-            $current_url = $_SERVER['REQUEST_URI'] ?? '';
-            
-            // Check for Google domains in the URL
-            if (strpos($current_url, 'google.com') !== false || 
-                strpos($current_url, 'googleapis.com') !== false) {
-                $provider = 'google';
-            } elseif (preg_match('#/auth/([^/]+)#', $current_url, $matches)) {
-                $provider = sanitize_key($matches[1]);
-            }
-        }
-        
-        $token = sanitize_text_field($_REQUEST['token'] ?? '');
-        
-        error_log('Provider: ' . $provider . ', Token: ' . $token);
-        
-        if (empty($provider) || !isset($this->providers[$provider])) {
-            error_log('Invalid or missing provider: ' . $provider);
-            wp_die('Invalid or missing provider');
-        }
-
         try {
-            $auth_url = $this->providers[$provider]->get_auth_url();
-            $state = json_encode(['p' => $provider, 't' => $token]);
-            $encoded_state = rtrim(strtr(base64_encode($state), '+/', '-_'), '=');
-            $final_url = add_query_arg('state', $encoded_state, $auth_url);
-            
-            wp_redirect($final_url);
+            $name = sanitize_text_field($_REQUEST['name'] ?? '');
+            $auth_url = $this->providers['google']->get_auth_url($name);
+            wp_redirect($auth_url);
             exit;
         } catch (Exception $e) {
             error_log('Auth redirect error: ' . $e->getMessage());

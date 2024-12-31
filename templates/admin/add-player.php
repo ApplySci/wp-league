@@ -11,27 +11,31 @@ $unregistered_players = $game_history->get_unregistered_players();
     <h1><?php echo esc_html(get_admin_page_title()); ?></h1>
 
     <?php
-    // Try multiple ways to display messages
-    
-    // 1. Direct settings errors
-    settings_errors('league_invite');
-    
-    // 2. Check transient
-    if ($errors = get_transient('settings_errors')) {
-        foreach ($errors as $error) {
-            echo '<div class="notice notice-' . esc_attr($error['type']) . ' is-dismissible">';
-            echo '<p>' . esc_html($error['message']) . '</p>';
-            echo '</div>';
+    // Display admin notices
+    if (isset($_GET['message'])) {
+        $message = '';
+        $type = 'success';
+        
+        switch ($_GET['message']) {
+            case 'sent':
+                $player_name = sanitize_text_field($_GET['name'] ?? '');
+                $message = $player_name ? 
+                    sprintf(__('Invitation email sent to %s successfully.', 'league-profiles'), $player_name) :
+                    __('Invitation email sent successfully.', 'league-profiles');
+                break;
+            case 'error':
+                $message = __('Failed to send invitation email. Please try again.', 'league-profiles');
+                $type = 'error';
+                break;
         }
-        delete_transient('settings_errors');
-    }
-    
-    // 3. Check custom message
-    if ($message = get_transient('league_admin_message')) {
-        echo '<div class="notice notice-success is-dismissible">';
-        echo '<p>' . esc_html($message) . '</p>';
-        echo '</div>';
-        delete_transient('league_admin_message');
+
+        if ($message) {
+            printf(
+                '<div class="notice notice-%s is-dismissible"><p>%s</p></div>',
+                esc_attr($type),
+                esc_html($message)
+            );
+        }
     }
 
     require_once LEAGUE_PLUGIN_DIR . 'templates/admin/database-status.php';
@@ -59,11 +63,13 @@ $unregistered_players = $game_history->get_unregistered_players();
                     <select name="trr_id" id="player_search" class="player-select" required>
                         <option value=""><?php esc_html_e('Select player...', 'league-profiles'); ?></option>
                         <?php foreach ($unregistered_players as $player): ?>
-                            <option value="<?php echo esc_attr($player['trr_id']); ?>">
+                            <option value="<?php echo esc_attr($player['trr_id']); ?>" 
+                                    data-name="<?php echo esc_attr($player['name']); ?>">
                                 <?php echo esc_html($player['name']); ?>
                             </option>
                         <?php endforeach; ?>
                     </select>
+                    <input type="hidden" name="player_name" id="player_name">
                 </td>
             </tr>
             <tr>
@@ -85,6 +91,9 @@ jQuery(document).ready(function($) {
     $('#player_search').select2({
         width: '100%',
         placeholder: '<?php esc_attr_e('Search and select player...', 'league-profiles'); ?>'
+    }).on('change', function() {
+        var selectedOption = $(this).find('option:selected');
+        $('#player_name').val(selectedOption.data('name'));
     });
 });
 </script> 
