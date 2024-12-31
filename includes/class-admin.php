@@ -6,23 +6,15 @@ class League_Admin {
     private const INVITE_EMAIL_TEMPLATE = <<<END
         Hello %s,
 
-
         You've been invited to join the World Riichi League website.
 
-        
         We're creating a players-only section for the website, where you can see your game history,
         your current rank, and more.
 
-
         Click here to accept: %s
 
-
         Best regards,
-
-
         World Riichi League
-
-
         END;
     private const PERMISSION_ERROR = 'Insufficient permissions';
     private const INVALID_REQUEST = 'Invalid request';

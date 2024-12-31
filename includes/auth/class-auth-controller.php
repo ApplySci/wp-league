@@ -130,19 +130,36 @@ class League_Auth_Controller {
                 update_post_meta($profile_id, 'auth_provider', 'google');
             }
 
-            // Store auth data in session
-            if (!session_id()) {
-                session_start();
-            }
-
-            $_SESSION['trr_id'] = $invite_data['trr_id'];
-            $_SESSION['auth_token'] = base64_encode(json_encode([
+            // Set secure cookie for auth
+            $cookie_data = [
                 'trr_id' => $invite_data['trr_id'],
                 'timestamp' => time()
-            ]));
+            ];
+            
+            setcookie(
+                'league_auth',
+                base64_encode(json_encode($cookie_data)),
+                [
+                    'expires' => time() + (30 * DAY_IN_SECONDS),
+                    'path' => '/',
+                    'domain' => parse_url(home_url(), PHP_URL_HOST),
+                    'secure' => true,
+                    'httponly' => true,
+                    'samesite' => 'Lax'
+                ]
+            );
 
-            // Redirect to profile edit
-            wp_safe_redirect(get_edit_post_link($profile_id, 'redirect'));
+            // Update registration status in postmeta
+            update_post_meta($profile_id, 'registration_status', 'complete');
+            update_post_meta($profile_id, 'registration_date', current_time('mysql'));
+
+            // Redirect to profile edit page
+            $redirect_url = add_query_arg([
+                'trr_id' => $invite_data['trr_id'],
+                'auth_state' => wp_create_nonce('auth_complete')
+            ], home_url('/player/edit/'));
+
+            wp_safe_redirect($redirect_url);
             exit;
 
         } catch (Exception $e) {

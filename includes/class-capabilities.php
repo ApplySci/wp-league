@@ -1,4 +1,6 @@
 <?php
+declare(strict_types=1);
+
 class League_Capabilities {
     public static function register_capabilities(): void {
         // Register custom capabilities for the player post type
@@ -19,18 +21,14 @@ class League_Capabilities {
         ];
     }
 
-    public static function check_player_access($post_id, $user_id): bool {
-        if (!$post_id || !$user_id) {
-            return false;
+    public static function check_player_access(int $post_id, int $user_id): bool {
+        // Check for session-based auth first
+        if (session_id() && isset($_SESSION['trr_id'])) {
+            $post_trr_id = get_post_meta($post_id, 'trr_id', true);
+            return $post_trr_id === $_SESSION['trr_id'];
         }
 
-        // Admins always have access
-        if (user_can($user_id, 'edit_others_league_players')) {
-            return true;
-        }
-
-        // Check if the user is the owner of the profile
-        $player_user_id = get_post_meta($post_id, 'player_user_id', true);
-        return $user_id == $player_user_id;
+        // Fallback to WordPress permissions
+        return current_user_can('edit_post', $post_id);
     }
 } 
