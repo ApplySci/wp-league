@@ -41,13 +41,13 @@ class League_Auth_Controller {
             
             if (!$decoded_state || 
                 !isset($decoded_state['p']) || 
-                $decoded_state['p'] !== 'google' ||
-                !wp_verify_nonce($decoded_state['nonce'], 'google_auth')) {
+                !isset($this->providers[$decoded_state['p']]) ||
+                !wp_verify_nonce($decoded_state['nonce'], $decoded_state['p'] . '_auth')) {
                 error_log('OAuth callback: Invalid state parameter');
                 throw new Exception('Invalid state parameter');
             }
 
-            $provider = $this->providers['google'];
+            $provider = $this->providers[$decoded_state['p']];
             error_log('OAuth callback: Getting token...');
             $token_data = $provider->get_token($code);
             error_log('OAuth callback: Token response: ' . print_r($token_data, true));
@@ -117,7 +117,7 @@ class League_Auth_Controller {
                     'meta_input' => [
                         'trr_id' => $invite_data['trr_id'],
                         'auth_email' => $user_info['email'],
-                        'auth_provider' => 'google'
+                        'auth_provider' => $decoded_state['p']
                     ]
                 ]);
 
@@ -127,7 +127,7 @@ class League_Auth_Controller {
             } else {
                 // Update existing profile with auth details
                 update_post_meta($profile_id, 'auth_email', $user_info['email']);
-                update_post_meta($profile_id, 'auth_provider', 'google');
+                update_post_meta($profile_id, 'auth_provider', $decoded_state['p']);
             }
 
             // Set secure cookie for auth
@@ -173,7 +173,13 @@ class League_Auth_Controller {
     public function handle_auth_redirect(): void {
         try {
             $name = sanitize_text_field($_REQUEST['name'] ?? '');
-            $auth_url = $this->providers['google']->get_auth_url($name);
+            $provider = sanitize_text_field($_REQUEST['provider'] ?? 'google');
+            
+            if (!isset($this->providers[$provider])) {
+                throw new Exception('Invalid provider');
+            }
+            
+            $auth_url = $this->providers[$provider]->get_auth_url($name);
             wp_redirect($auth_url);
             exit;
         } catch (Exception $e) {

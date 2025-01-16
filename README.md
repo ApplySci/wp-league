@@ -1,6 +1,6 @@
 # League Profiles WordPress Plugin
 
-A WordPress plugin for managing player profiles and game histories for a league system. Integrates with an existing SQLite database of game records and provides OAuth2 authentication.
+A WordPress plugin for managing player profiles and game histories for a league system. Integrates with an existing SQLite database of game records and provides OAuth2 authentication. Note that the player logins are completely separate from the Wordpress user database.
 
 ## Core Files
 

@@ -2,19 +2,20 @@
 declare(strict_types=1);
 
 class League_Admin {
-    private const INVITE_EMAIL_SUBJECT = 'Invitation to Join World Riichi League';
+    private const INVITE_EMAIL_SUBJECT = "Invitation to Join World Riichi League members' website";
     private const INVITE_EMAIL_TEMPLATE = <<<END
-        Hello %s,
+        Hello %s,\r\n
 
-        You've been invited to join the World Riichi League website.
+        You've been invited to join the World Riichi League website.\r\n
 
         We're creating a players-only section for the website, where you can see your game history,
-        your current rank, and more.
+        your current rank, and more.\r\n
 
-        Click here to accept: %s
+        If you have a google account, you can register on our website, upload your own profile picture,
+        and edit your bio, at this link: %s\r\n
 
-        Best regards,
-        World Riichi League
+        Best regards,\r\n
+        World Riichi League\r\n
         END;
     private const PERMISSION_ERROR = 'Insufficient permissions';
     private const INVALID_REQUEST = 'Invalid request';

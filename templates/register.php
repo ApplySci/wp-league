@@ -43,7 +43,7 @@ if ($auth_state && wp_verify_nonce($auth_state, 'auth_complete') && session_id()
     ); ?></h1>
     
     <p class="register-intro">
-        <?php esc_html_e('Please login', 'league-profiles'); ?>
+        <?php esc_html_e('Please login. We currently only support Google logins.', 'league-profiles'); ?>
     </p>
 
     <div class="oauth-buttons">
@@ -55,13 +55,13 @@ if ($auth_state && wp_verify_nonce($auth_state, 'auth_complete') && session_id()
             <?php esc_html_e('Google', 'league-profiles'); ?>
         </a>
 
-        <a href="<?php echo esc_url(add_query_arg([
+        <!--a href="<?php echo esc_url(add_query_arg([
             'action' => 'league_auth',
             'provider' => 'apple',
             'token' => $token
         ], admin_url('admin-post.php'))); ?>" class="oauth-button apple">
             <?php esc_html_e('Apple', 'league-profiles'); ?>
-        </a>
+        </a-->
     </div>
 </div>
 
